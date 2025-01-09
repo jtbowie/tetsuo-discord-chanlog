@@ -1,3 +1,4 @@
+from logging import NullHandler
 import discord
 import sqlite3
 import os
@@ -26,9 +27,8 @@ try:
             channel_id TEXT,
             author_id TEXT,
             content TEXT,
+            sentiment FLOAT,
             timestamp TEXT,
-            attachment BLOB,
-            attachment_name TEXT
         )
         """
     )
@@ -79,28 +79,37 @@ async def fetch_initial_messages(ctx):
         messages = [msg async for msg in channel.history(limit=250)]
         
         for message in messages:
-            attachment_blob = None
-            attachment_name = None
-            if message.attachments:
-                attachment = message.attachments[0]
-                attachment_blob = await attachment.read()  # This is now async
-                attachment_name = attachment.filename
-
-            execute_sql(
-                """
-                INSERT OR REPLACE INTO messages (message_id, channel_id, author_id, content, timestamp, attachment, attachment_name) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    str(message.id),
-                    str(channel.id),
-                    str(message.author.id),
-                    message.content,
-                    message.created_at.isoformat(),
-                    attachment_blob if attachment_blob else None,
-                    attachment_name,
+            if message.content.startswith("Sentiment"):
+                compound = float(message.content.split(" ")[-1][:-1])
+                execute_sql(
+                    """
+                    INSERT OR REPLACE INTO messages (message_id, channel_id, author_id, content, timestamp, sentiment) 
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(message.id),
+                        str(channel.id),
+                        str(message.author.id),
+                        message.content,
+                        message.created_at.isoformat(),
+                        compound
+                    )
                 )
-            )
+            else:
+                execute_sql(
+                    """
+                    INSERT OR REPLACE INTO messages (message_id, channel_id, author_id, content, timestamp) 
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(message.id),
+                        str(channel.id),
+                        str(message.author.id),
+                        message.content,
+                        message.created_at.isoformat(),
+                    )
+                )
+
 
         print(f"Fetched and stored {len(messages)} messages.")
     else:
