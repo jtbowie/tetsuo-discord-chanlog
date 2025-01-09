@@ -28,7 +28,7 @@ try:
             author_id TEXT,
             content TEXT,
             sentiment FLOAT,
-            timestamp TEXT,
+            timestamp TEXT
         )
         """
     )
@@ -84,7 +84,7 @@ async def fetch_initial_messages(ctx):
                 execute_sql(
                     """
                     INSERT OR REPLACE INTO messages (message_id, channel_id, author_id, content, timestamp, sentiment) 
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(message.id),
@@ -126,28 +126,38 @@ async def on_message(message):
     else:
         await bot.process_commands(message)
 
-    attachment_blob = None
-    attachment_name = None
-    if message.attachments:
-        attachment = message.attachments[0]
-        attachment_blob = await attachment.read()  # Now async
-        attachment_name = attachment.filename
+    if message.content.startswith("Sentiment"):
+        compound = float(message.content.split(" ")[-1][:-1])
 
-    execute_sql(
-        """
-        INSERT OR REPLACE INTO messages (message_id, channel_id, author_id, content, timestamp, attachment, attachment_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            str(message.id),
-            str(message.channel.id),
-            str(message.author.id),
-            message.content,
-            message.created_at.isoformat(),
-            attachment_blob if attachment_blob else None,
-            attachment_name,
+        execute_sql(
+            """
+            INSERT OR REPLACE INTO messages (message_id, channel_id, author_id, content, timestamp,sentiment)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(message.id),
+                str(message.channel.id),
+                str(message.author.id),
+                message.content,
+                message.created_at.isoformat(),
+                compound
+            )
         )
-    )
+    else:
+       execute_sql(
+           """
+           INSERT OR REPLACE INTO messages (message_id, channel_id, author_id, content, timestamp) 
+           VALUES (?, ?, ?, ?, ?)
+           """,
+           (
+               str(message.id),
+               str(message.channel.id),
+               str(message.author.id),
+               message.content,
+               message.created_at.isoformat(),
+           )
+       )
+
     print(f"New message logged: {message.content}")
 
 def main():
